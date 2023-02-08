@@ -1,0 +1,75 @@
+import pandas as pd
+import os
+import numpy as np
+from scipy.stats import zscore
+import matplotlib.pyplot as plt
+
+print("Current working directory:", os.getcwd())
+file_path = '/Users/fernandohuerta/Documents/Data_Science/Projects/Portfolio/Housing/Data/Housing.csv'
+# Read the .csv file into a DataFrame
+df = pd.read_csv(file_path)
+
+# Print the first 5 rows of the DataFrame
+print(df.head())
+
+# Handle missing values
+numeric_columns = df.select_dtypes(include=[np.number]).columns
+df[numeric_columns] = df[numeric_columns].fillna(df[numeric_columns].mean())
+
+# Handle outliers
+z_scores = np.abs(zscore(df[numeric_columns]))
+df = df[(z_scores < 3).all(axis=1)] # Keep only rows with z-scores less than 3
+
+
+def one_hot_encoding(df, cols, drop_first=True):
+    df_encoded = pd.get_dummies(df, columns=cols, drop_first=drop_first)
+    return df_encoded
+
+
+# Handle non-numeric features
+df = one_hot_encoding(df, cols=['mainroad','guestroom','basement','hotwaterheating','airconditioning','prefarea','furnishingstatus']) # One-hot encode the "location" feature
+
+print(df.columns)
+
+# check the data for any missing values
+print(df.isnull().sum())
+
+# summarize the numerical columns
+print(df.describe())
+
+# create histograms for all numerical columns
+df.hist(bins=50, figsize=(20,15))
+plt.show()
+
+# create box plots for all numerical columns
+df.plot(kind='box', subplots=True, layout=(4,4), sharex=False, sharey=False, figsize=(20,15))
+plt.show()
+
+# create scatter matrix
+pd.plotting.scatter_matrix(df, alpha=0.2, figsize=(20,15))
+plt.show()
+
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.model_selection import cross_val_score
+
+
+# Split the data into features and target
+X = df.drop("price", axis=1)
+y = df["price"]
+
+# List of models to be evaluated
+models = [LinearRegression(), DecisionTreeRegressor(), 
+          RandomForestRegressor(), GradientBoostingRegressor()]
+
+# Evaluate each model using cross-validation
+for model in models:
+    scores = cross_val_score(model, X, y, cv=5)
+    print(f"{model.__class__.__name__} Cross-Validation Scores: {scores}")
+    print(f"{model.__class__.__name__} Mean Cross-Validation Score: {scores.mean()}")
+    print("\n")
+
+# Select the best model based on mean cross-validation score
+best_model = models[np.argmax([scores.mean() for scores in [cross_val_score(model, X, y, cv=5) for model in models]])]
+print(f"Best Model: {best_model.__class__.__name__}")
